@@ -2,8 +2,6 @@
 
 A technical assessment project for a Go backend, React TypeScript frontend, PostgreSQL database, and Docker Compose setup.
 
-**Project status:** requirements and assumptions are being documented. The application is not implemented yet. Run and test instructions will be added with the implementation.
-
 ## Assessment Requirements
 
 The required functionality includes database migrations and seed chargers, charger listing and reservation REST endpoints, a background status simulator running every 10–15 seconds, WebSocket status broadcasts, and a live dashboard with a reservation form.
@@ -17,7 +15,7 @@ The deliverable will retain `backend/`, `frontend/`, `migrations/`, `docker-comp
 
 ## Assumptions & Trade-offs
 
-The assessment leaves some behavior unspecified. The following decisions define the intended implementation; they are not claims of completed functionality.
+The following assumptions and trade-offs define behavior left unspecified by the assessment.
 
 ### Charger and device simulation
 
@@ -28,6 +26,7 @@ The assessment leaves some behavior unspecified. The following decisions define 
 ### Identity — an agreed extension
 
 - **Simple login and logout use seeded test accounts.** Registration, password recovery, and third-party authentication are excluded.
+- **User IDs are UUIDs**, including the user foreign keys in login sessions and reservations. API requests send them as UUID strings. The assessment's `user-123` is treated as an illustrative value rather than a required literal. Charger IDs remain text so the required `charger-1` test fixture is preserved.
 - **Users may reserve only for themselves.** The reservation request retains the assessment's `user_id`, `start_time`, and `end_time` fields. The backend checks that `user_id` matches the authenticated session rather than trusting the submitted identity.
 - **The form retains a user ID input, prefilled with the signed-in user's ID.** This preserves the requested interface while preventing reservations on behalf of another account.
 - Login adds setup to the concurrency test: all 10 requests must be authenticated and otherwise valid, so the nine failures represent reservation conflicts rather than authentication errors.
