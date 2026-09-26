@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EV Charger API — Swagger UI</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="./swagger-ui.css">
+    <style>body { margin: 0; background: #fafafa; }</style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="./swagger-ui-bundle.js"></script>
+    <script>
+      SwaggerUIBundle({
+        url: "./openapi.json",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        validatorUrl: null,
+        presets: [SwaggerUIBundle.presets.apis]
+      });
+    </script>
+  </body>
+</html>

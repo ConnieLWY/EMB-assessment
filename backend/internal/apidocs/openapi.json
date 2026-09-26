@@ -1,0 +1,84 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "EV Charger API",
+    "version": "0.1.0",
+    "description": "Live charger status and reservation application API."
+  },
+  "servers": [{"url": "/", "description": "Current server"}],
+  "tags": [{"name": "Chargers", "description": "Current charger availability and status."}],
+  "paths": {
+    "/api/chargers": {
+      "get": {
+        "tags": ["Chargers"],
+        "summary": "List chargers",
+        "description": "Returns all chargers ordered by ID. Current device status does not indicate availability for every future reservation slot. No authentication is required.",
+        "operationId": "listChargers",
+        "responses": {
+          "200": {
+            "description": "Charger list. An empty collection is returned as an empty array.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ChargerList"},
+                "example": {
+                  "chargers": [{
+                    "id": "charger-1",
+                    "name": "Charger 1",
+                    "location": "Level 1, Bay A",
+                    "status": "AVAILABLE",
+                    "updated_at": "2026-09-27T10:00:00Z"
+                  }]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The charger list could not be retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorResponse"},
+                "example": {"error": {"code": "INTERNAL_ERROR", "message": "An unexpected error occurred."}}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChargerList": {
+        "type": "object",
+        "required": ["chargers"],
+        "properties": {
+          "chargers": {"type": "array", "items": {"$ref": "#/components/schemas/Charger"}}
+        }
+      },
+      "Charger": {
+        "type": "object",
+        "required": ["id", "name", "location", "status", "updated_at"],
+        "properties": {
+          "id": {"type": "string", "example": "charger-1"},
+          "name": {"type": "string", "example": "Charger 1"},
+          "location": {"type": "string", "example": "Level 1, Bay A"},
+          "status": {"type": "string", "enum": ["AVAILABLE", "CHARGING", "MAINTENANCE"]},
+          "updated_at": {"type": "string", "format": "date-time", "description": "UTC timestamp of the latest status update."}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": {"type": "string", "example": "INTERNAL_ERROR"},
+              "message": {"type": "string", "example": "An unexpected error occurred."}
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,73 @@
 
 A technical assessment project for a Go backend, React TypeScript frontend, PostgreSQL database, and Docker Compose setup.
 
+## Design Documents
+
+- [Database ERD](ERD.md)
+- [API Contract](API.md)
+
+## Run the Backend
+
+Prerequisites: Docker with Docker Compose. Local Go development also requires Go 1.27 or later and the [golang-migrate CLI](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate) v4.20.1.
+
+From the repository root:
+
+```sh
+docker compose up --build -d backend
+curl http://localhost:8080/api/chargers
+```
+
+Compose waits for PostgreSQL to be healthy, applies SQL migrations through a one-shot `migrate` service, and starts the backend only after migration success. Database state persists in the `postgres_data` volume. `docker compose down` stops the services without removing that volume.
+
+The default local ports are `8080` for the backend, `55432` for the development database, and `55433` for the separate test database. `.env.example` lists the configuration values; copy it to `.env` to override Compose defaults. The included passwords are public local demonstration values, not production credentials.
+
+To run Go directly instead of the backend container:
+
+```sh
+docker compose up -d --wait db
+docker compose run --rm migrate
+cd backend
+DATABASE_URL='postgres://ev_app:local-dev-only@localhost:55432/ev_charger?sslmode=disable' go run ./cmd/server
+```
+
+Use one backend at a time to avoid port conflicts. Set `HTTP_ADDR` to override its default `:8080` listener.
+
+## Swagger UI
+
+Open [Swagger UI](http://localhost:8080/swagger/) after starting the backend. Expand `GET /api/chargers`, select **Try it out**, then **Execute** to query the running database.
+
+The [OpenAPI document](backend/internal/apidocs/openapi.json) is served at `/swagger/openapi.json`. Swagger UI assets are bundled with the Go backend, so browser access requires no external CDN or separate documentation container. API requests use the same origin as the documentation page.
+
+Update the OpenAPI document alongside each new endpoint. [API.md](API.md) describes the complete application contract; Swagger UI exposes the available endpoints.
+
+## Migrations and Seed Data
+
+SQL migrations live in `migrations/` and use paired `.up.sql` and `.down.sql` files. `golang-migrate` records the applied version in `schema_migrations`; rerunning `up` does not duplicate seed data. The backend checks that migrations have completed and never changes the schema itself.
+
+- `000001_schema`: creates users, login sessions, chargers, reservations, charging sessions, and their constraints.
+- `000002_seed`: adds three chargers and two demo users. `charger-1` and `charger-2` start available; `charger-3` starts in maintenance.
+
+| Username | User ID | Demo password |
+| --- | --- | --- |
+| `alice` | `11111111-1111-4111-8111-111111111111` | `DemoPass123!` |
+| `bob` | `22222222-2222-4222-8222-222222222222` | `DemoPass123!` |
+
+Passwords are stored as bcrypt hashes. Rolling back seed data is permitted only when it has no dependent application records; foreign keys prevent silently deleting reservations or sessions. Schema rollback removes application tables and is intended for disposable databases.
+
+## Run Backend Tests
+
+Install the prerequisites above, then run from the repository root:
+
+```sh
+docker compose --profile test up -d --wait test-db
+cd backend
+TEST_DATABASE_URL='postgres://ev_test:local-test-only@localhost:55433/ev_charger_test?sslmode=disable' go test -race ./... -count=1
+```
+
+The test fixture requires a database URL whose database name ends in `_test`. Each test creates its own randomly named database on that test server, runs the real migration CLI, and drops only that temporary database afterward. The test account therefore needs database creation permission. A missing test database configuration fails the test instead of silently skipping it.
+
+Tests cover migration application and rollback, seed password verification, non-overlapping reservation intervals, adjacent slots, one unfinished charging session per charger, matching charger references, configuration validation, and HTTP charger listing with empty and database-error responses.
+
 ## Assessment Requirements
 
 The required functionality includes database migrations and seed chargers, charger listing and reservation REST endpoints, a background status simulator running every 10–15 seconds, WebSocket status broadcasts, and a live dashboard with a reservation form.

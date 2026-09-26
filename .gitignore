@@ -1,2 +1,6 @@
 Technical_Assessment_Notion.md
 /docs
+.env
+.env.*
+!.env.example
+/backend/bin/
