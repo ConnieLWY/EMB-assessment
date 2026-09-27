@@ -146,7 +146,7 @@ curl -i -b /tmp/ev-charger-cookies.txt -c /tmp/ev-charger-cookies.txt \
   http://localhost:8080/api/auth/logout
 ```
 
-Login is limited to 10 attempts per direct client IP per minute. The bounded in-memory limiter is intended for the single-backend assessment; it resets on restart and does not use untrusted forwarded IP headers. Requests beyond the limit return `429` with a `Retry-After` header.
+Login is limited to 10 attempts per direct client IP per minute. The bounded in-memory limiter is intended for the single-backend assessment; it resets on restart and does not use untrusted forwarded IP headers. When requests pass through the frontend nginx proxy, users can share the proxy's IP and therefore the same login limit. Requests beyond the limit return `429` with a `Retry-After` header.
 
 ## Migrations and Seed Data
 
