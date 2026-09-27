@@ -214,6 +214,135 @@
                     }
                 }
             }
+        },
+        "/api/chargers/{id}/reserve": {
+            "post": {
+                "description": "Requires the session cookie and an allowed Origin. The user_id must match the signed-in user. Intervals are half-open and timestamps require an explicit offset.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reservations"
+                ],
+                "summary": "Reserve a charger",
+                "operationId": "reserveCharger",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Charger ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reservation interval and user ID",
+                        "name": "reservation",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/charger.ReserveInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Reservation created",
+                        "schema": {
+                            "$ref": "#/definitions/charger.ReservationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "VALIDATION_ERROR",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "USER_ID_MISMATCH or ORIGIN_NOT_ALLOWED",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "CHARGER_NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "RESERVATION_CONFLICT, CHARGER_OCCUPIED, or CHARGER_IN_MAINTENANCE",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "PAYLOAD_TOO_LARGE",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "UNSUPPORTED_MEDIA_TYPE",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/reservations": {
+            "get": {
+                "description": "Returns only the signed-in user's reservations, ordered by start time descending.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reservations"
+                ],
+                "summary": "List my reservations",
+                "operationId": "listReservations",
+                "responses": {
+                    "200": {
+                        "description": "Current user's reservations",
+                        "schema": {
+                            "$ref": "#/definitions/charger.ReservationList"
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "ORIGIN_NOT_ALLOWED",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -319,6 +448,68 @@
                     "items": {
                         "$ref": "#/definitions/charger.Charger"
                     }
+                }
+            }
+        },
+        "charger.Reservation": {
+            "type": "object",
+            "properties": {
+                "charger_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "charger.ReservationList": {
+            "type": "object",
+            "properties": {
+                "reservations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/charger.Reservation"
+                    }
+                }
+            }
+        },
+        "charger.ReservationResponse": {
+            "type": "object",
+            "properties": {
+                "reservation": {
+                    "$ref": "#/definitions/charger.Reservation"
+                }
+            }
+        },
+        "charger.ReserveInput": {
+            "type": "object",
+            "properties": {
+                "end_time": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
                 }
             }
         },

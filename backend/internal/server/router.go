@@ -26,9 +26,12 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	mux := http.NewServeMux()
 	apidocs.RegisterRoutes(mux)
-	handler := charger.NewHandler(charger.NewStore(deps.Pool))
+	store := charger.NewStore(deps.Pool)
+	handler := charger.NewHandler(store, charger.NewService(store, deps.Now, nil))
 	mux.HandleFunc("GET /api/chargers", handler.List)
 	authHandler := auth.NewHandler(auth.NewService(deps.Pool, deps.Now), deps.CookieSecure)
+	mux.Handle("POST /api/chargers/{id}/reserve", authHandler.RequireUser(http.HandlerFunc(handler.Reserve)))
+	mux.Handle("GET /api/reservations", authHandler.RequireUser(http.HandlerFunc(handler.ListReservations)))
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
 	mux.Handle("GET /api/auth/me", authHandler.RequireUser(http.HandlerFunc(authHandler.Me)))

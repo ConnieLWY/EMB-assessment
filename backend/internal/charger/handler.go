@@ -2,15 +2,22 @@ package charger
 
 import (
 	"context"
+	"errors"
+	"ev-charger-assessment/backend/internal/auth"
 	"ev-charger-assessment/backend/internal/httpapi"
 	"log/slog"
 	"net/http"
 	"time"
 )
 
-type Handler struct{ store *Store }
+type Handler struct {
+	store   *Store
+	service *Service
+}
 
-func NewHandler(store *Store) *Handler { return &Handler{store: store} }
+func NewHandler(store *Store, service *Service) *Handler {
+	return &Handler{store: store, service: service}
+}
 
 // List returns the current charger snapshot.
 // @Summary List chargers
@@ -33,4 +40,82 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpapi.JSON(w, http.StatusOK, ChargerList{Chargers: chargers})
+}
+
+// Reserve creates a future reservation for the signed-in user.
+// @Summary Reserve a charger
+// @Description Requires the session cookie and an allowed Origin. The user_id must match the signed-in user. Intervals are half-open and timestamps require an explicit offset.
+// @Tags Reservations
+// @ID reserveCharger
+// @Accept json
+// @Produce json
+// @Param id path string true "Charger ID"
+// @Param reservation body ReserveInput true "Reservation interval and user ID"
+// @Success 201 {object} ReservationResponse "Reservation created"
+// @Failure 400 {object} httpapi.ErrorResponse "VALIDATION_ERROR"
+// @Failure 401 {object} httpapi.ErrorResponse "UNAUTHENTICATED"
+// @Failure 403 {object} httpapi.ErrorResponse "USER_ID_MISMATCH or ORIGIN_NOT_ALLOWED"
+// @Failure 404 {object} httpapi.ErrorResponse "CHARGER_NOT_FOUND"
+// @Failure 409 {object} httpapi.ErrorResponse "RESERVATION_CONFLICT, CHARGER_OCCUPIED, or CHARGER_IN_MAINTENANCE"
+// @Failure 413 {object} httpapi.ErrorResponse "PAYLOAD_TOO_LARGE"
+// @Failure 415 {object} httpapi.ErrorResponse "UNSUPPORTED_MEDIA_TYPE"
+// @Failure 500 {object} httpapi.ErrorResponse "INTERNAL_ERROR"
+// @Router /api/chargers/{id}/reserve [post]
+func (h *Handler) Reserve(w http.ResponseWriter, r *http.Request) {
+	var input ReserveInput
+	if !httpapi.Decode(w, r, &input) {
+		return
+	}
+	user, _ := auth.UserFromContext(r.Context())
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	reservation, err := h.service.Reserve(ctx, user.ID, r.PathValue("id"), input)
+	if err != nil {
+		reservationError(w, r, err)
+		return
+	}
+	httpapi.JSON(w, 201, ReservationResponse{Reservation: reservation})
+}
+
+// ListReservations returns the signed-in user's reservations.
+// @Summary List my reservations
+// @Description Returns only the signed-in user's reservations, ordered by start time descending.
+// @Tags Reservations
+// @ID listReservations
+// @Produce json
+// @Success 200 {object} ReservationList "Current user's reservations"
+// @Failure 401 {object} httpapi.ErrorResponse "UNAUTHENTICATED"
+// @Failure 403 {object} httpapi.ErrorResponse "ORIGIN_NOT_ALLOWED"
+// @Failure 500 {object} httpapi.ErrorResponse "INTERNAL_ERROR"
+// @Router /api/reservations [get]
+func (h *Handler) ListReservations(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.UserFromContext(r.Context())
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	reservations, err := h.store.ListReservations(ctx, user.ID)
+	if err != nil {
+		reservationError(w, r, err)
+		return
+	}
+	httpapi.JSON(w, 200, ReservationList{Reservations: reservations})
+}
+
+func reservationError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, ErrValidation):
+		httpapi.Error(w, 400, "VALIDATION_ERROR", "Provide a valid user ID and future time interval.")
+	case errors.Is(err, ErrUserMismatch):
+		httpapi.Error(w, 403, "USER_ID_MISMATCH", "Reservation user ID must match the signed-in user.")
+	case errors.Is(err, ErrChargerNotFound):
+		httpapi.Error(w, 404, "CHARGER_NOT_FOUND", "Charger not found.")
+	case errors.Is(err, ErrReservationConflict):
+		httpapi.Error(w, 409, "RESERVATION_CONFLICT", "This charger is already reserved for the selected time slot.")
+	case errors.Is(err, ErrOccupied):
+		httpapi.Error(w, 409, "CHARGER_OCCUPIED", "This charger is occupied for the selected time slot.")
+	case errors.Is(err, ErrMaintenance):
+		httpapi.Error(w, 409, "CHARGER_IN_MAINTENANCE", "This charger is currently in maintenance.")
+	default:
+		slog.ErrorContext(r.Context(), "reservation request failed", "error", err)
+		httpapi.Error(w, 500, "INTERNAL_ERROR", "An unexpected error occurred.")
+	}
 }

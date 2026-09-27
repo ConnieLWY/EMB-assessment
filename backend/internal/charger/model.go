@@ -13,3 +13,33 @@ type Charger struct {
 type ChargerList struct {
 	Chargers []Charger `json:"chargers" binding:"required"`
 }
+
+type Reservation struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	ChargerID string    `json:"charger_id"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type ReserveInput struct {
+	UserID    string    `json:"user_id"`
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+}
+
+type ReservationResponse struct {
+	Reservation Reservation `json:"reservation"`
+}
+type ReservationList struct {
+	Reservations []Reservation `json:"reservations"`
+}
+
+type StatusEvent struct {
+	ChargerID string    `json:"charger_id"`
+	Status    string    `json:"status"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
