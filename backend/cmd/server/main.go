@@ -4,16 +4,20 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
+	"ev-charger-assessment/backend/internal/charger"
 	"ev-charger-assessment/backend/internal/config"
 	"ev-charger-assessment/backend/internal/database"
 	"ev-charger-assessment/backend/internal/realtime"
 	"ev-charger-assessment/backend/internal/server"
+	"ev-charger-assessment/backend/internal/simulator"
 )
 
 //go:generate go tool swag init -g main.go -d .,../../internal/auth,../../internal/charger,../../internal/httpapi,../../internal/realtime --parseInternal --output ../../internal/apidocs --outputTypes json
@@ -54,9 +58,32 @@ func run() error {
 	}
 	hub := realtime.NewHub(cfg.FrontendOrigin, cfg.APIOrigin)
 	defer hub.Close()
+	chargerService := charger.NewService(charger.NewStore(pool), time.Now, hub.Publish)
+	startupCtx, startupCancel := context.WithTimeout(ctx, 10*time.Second)
+	err = chargerService.Reconcile(startupCtx, time.Now())
+	startupCancel()
+	if err != nil {
+		return err
+	}
+	workerCtx, workerCancel := context.WithCancel(ctx)
+	var workers sync.WaitGroup
+	workers.Add(2)
+	go func() {
+		defer workers.Done()
+		simulator.Run(workerCtx, time.Second, func(ctx context.Context) error {
+			return chargerService.Reconcile(ctx, time.Now())
+		})
+	}()
+	go func() {
+		defer workers.Done()
+		simulator.Run(workerCtx, 12*time.Second, func(ctx context.Context) error {
+			return chargerService.Simulate(ctx, time.Now(), rand.Intn)
+		})
+	}()
+	defer func() { workerCancel(); workers.Wait() }()
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           server.NewRouter(server.Dependencies{Pool: pool, FrontendOrigin: cfg.FrontendOrigin, APIOrigin: cfg.APIOrigin, CookieSecure: cfg.CookieSecure, Hub: hub}),
+		Handler:           server.NewRouter(server.Dependencies{Pool: pool, FrontendOrigin: cfg.FrontendOrigin, APIOrigin: cfg.APIOrigin, CookieSecure: cfg.CookieSecure, Hub: hub, ChargerService: chargerService}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

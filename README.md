@@ -16,7 +16,10 @@ From the repository root:
 ```sh
 docker compose up --build -d backend
 curl http://localhost:8080/api/chargers
+docker compose logs -f backend
 ```
+
+Each `/api/` request logs its HTTP method, path, status, and `duration_ms`. A WebSocket connection logs its `101` handshake immediately. Request bodies, query strings, and cookies are excluded from access logs.
 
 Compose waits for PostgreSQL to be healthy, applies SQL migrations through a one-shot `migrate` service, and starts the backend only after migration success. Database state persists in the `postgres_data` volume. `docker compose down` stops the services without removing that volume.
 
@@ -155,8 +158,10 @@ The following assumptions and trade-offs define behavior left unspecified by the
 ### Simulator coordination
 
 - **The simulator respects reservations.** It does not overwrite active reserved sessions or start a simulated session that extends into the next reservation. Simulated sessions are released when due independently of random charger selection.
+- **A simulated charging session lasts at most 12 seconds.** When it ends without a pending reservation, that charger enters `MAINTENANCE`; a later simulator tick returns it to `AVAILABLE`. With a pending reservation it becomes available for that reservation instead.
 - **Chargers with pending reservations do not randomly enter maintenance.** This simplifies the demo and avoids deliberately invalidating accepted reservations; real equipment failures would require a broader disruption policy.
 - **If no charger is eligible for a random update, that tick is skipped.** Reservation correctness takes priority over producing a status event on every tick.
+- **One backend process owns the workers and WebSocket hub.** Database locks protect charger occupancy; a process-local lock keeps commit and event publication in order. Running multiple backend replicas would require a shared event bus and cross-process ordering.
 
 ### Responses and live updates
 

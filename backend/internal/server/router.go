@@ -6,6 +6,7 @@ import (
 	"ev-charger-assessment/backend/internal/charger"
 	"ev-charger-assessment/backend/internal/realtime"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -17,6 +18,8 @@ type Dependencies struct {
 	APIOrigin      string
 	CookieSecure   bool
 	Hub            *realtime.Hub
+	ChargerService *charger.Service
+	Logger         *slog.Logger
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -33,7 +36,10 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	mux.Handle("GET /api/ws", deps.Hub)
 	store := charger.NewStore(deps.Pool)
-	handler := charger.NewHandler(store, charger.NewService(store, deps.Now, nil))
+	if deps.ChargerService == nil {
+		deps.ChargerService = charger.NewService(store, deps.Now, nil)
+	}
+	handler := charger.NewHandler(store, deps.ChargerService)
 	mux.HandleFunc("GET /api/chargers", handler.List)
 	authHandler := auth.NewHandler(auth.NewService(deps.Pool, deps.Now), deps.CookieSecure)
 	mux.Handle("POST /api/chargers/{id}/reserve", authHandler.RequireUser(http.HandlerFunc(handler.Reserve)))
@@ -41,5 +47,5 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
 	mux.Handle("GET /api/auth/me", authHandler.RequireUser(http.HandlerFunc(authHandler.Me)))
-	return originPolicy(mux, deps.FrontendOrigin, deps.APIOrigin)
+	return requestLog(originPolicy(mux, deps.FrontendOrigin, deps.APIOrigin), deps.Logger)
 }

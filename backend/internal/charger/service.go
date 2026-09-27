@@ -3,6 +3,7 @@ package charger
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,6 +19,7 @@ var (
 )
 
 type Service struct {
+	mu      sync.Mutex
 	store   *Store
 	now     func() time.Time
 	publish func(StatusEvent)
@@ -34,6 +36,8 @@ func NewService(store *Store, now func() time.Time, publish func(StatusEvent)) *
 }
 
 func (s *Service) Reserve(ctx context.Context, actorID, chargerID string, input ReserveInput) (Reservation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	var id pgtype.UUID
 	now := s.now()
 	if err := id.Scan(input.UserID); err != nil || !id.Valid || input.StartTime.IsZero() || input.EndTime.IsZero() ||
