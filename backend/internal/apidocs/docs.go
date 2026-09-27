@@ -10,7 +10,7 @@ import (
 //go:embed index.html
 var index []byte
 
-//go:embed openapi.json
+//go:embed swagger.json
 var spec []byte
 
 func RegisterRoutes(mux *http.ServeMux) {
@@ -18,7 +18,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(index)
 	})
-	mux.HandleFunc("GET /swagger/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /swagger/swagger.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(spec)
 	})

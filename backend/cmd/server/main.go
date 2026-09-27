@@ -15,6 +15,12 @@ import (
 	"ev-charger-assessment/backend/internal/server"
 )
 
+//go:generate go tool swag init -g main.go -d .,../../internal/auth,../../internal/charger,../../internal/httpapi --parseInternal --output ../../internal/apidocs --outputTypes json
+
+// @title EV Charger API
+// @version 0.2.0
+// @description Live charger status and reservation application API. Sign in through POST /api/auth/login; the browser sends the HttpOnly session cookie automatically. Mutation requests require an allowed Origin.
+// @BasePath /
 func main() {
 	if err := run(); err != nil {
 		slog.Error("server stopped", "error", err)
@@ -42,12 +48,12 @@ func run() error {
 	checkCtx, checkCancel := context.WithTimeout(ctx, 5*time.Second)
 	err = pool.QueryRow(checkCtx, "SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty)
 	checkCancel()
-	if err != nil || dirty || version < 2 {
+	if err != nil || dirty || version < 3 {
 		return errors.New("database migrations must complete before backend startup")
 	}
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           server.NewRouter(server.Dependencies{Pool: pool}),
+		Handler:           server.NewRouter(server.Dependencies{Pool: pool, FrontendOrigin: cfg.FrontendOrigin, APIOrigin: cfg.APIOrigin, CookieSecure: cfg.CookieSecure}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

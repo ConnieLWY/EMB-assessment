@@ -30,6 +30,8 @@ services:
     environment:
       DATABASE_URL: postgres://ev_app:${DB_PASSWORD:-local-dev-only}@db:5432/ev_charger?sslmode=disable
       HTTP_ADDR: :8080
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:3000}
+      API_ORIGIN: ${API_ORIGIN:-http://localhost:8080}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

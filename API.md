@@ -29,9 +29,9 @@ Login uses a username and password from a seeded account. Successful login issue
 
 The cookie uses `HttpOnly`, `SameSite=Lax`, and `Path=/`, with no `Domain` attribute. Its lifetime is 24 hours, matching the server-side session expiration. HTTPS deployments also use `Secure`; local HTTP development omits that attribute. A successful login creates a fresh token and invalidates any previous session supplied by that browser.
 
-Browser mutations, including login and logout, require an `Origin` matching the configured frontend origin. Missing or untrusted origins return `403 ORIGIN_NOT_ALLOWED`. CLI clients and integration tests send the configured origin explicitly. The application uses the same host consistently in local development; `localhost` and `127.0.0.1` are not interchangeable for session cookies.
+Browser mutations, including login and logout, require an `Origin` matching `FRONTEND_ORIGIN` or `API_ORIGIN`. Defaults are `http://localhost:3000` for the frontend and `http://localhost:8080` for same-origin Swagger requests. Missing or untrusted origins return `403 ORIGIN_NOT_ALLOWED`. CLI clients and integration tests send an allowed origin explicitly. The application uses the same host consistently in local development; `localhost` and `127.0.0.1` are not interchangeable for session cookies. `API_ORIGIN` uses the externally visible backend origin and enables Secure cookies when its scheme is HTTPS.
 
-For direct cross-origin development requests, the frontend includes credentials and the backend allows only the configured frontend origin, with credentialed CORS and preflight support. Same-origin proxy deployments use relative `/api` URLs.
+For direct cross-origin development requests, the frontend includes credentials and the backend allows only these configured origins, with credentialed CORS and preflight support for GET/POST and Content-Type. Same-origin proxy deployments use relative `/api` URLs.
 
 ### POST /api/auth/login
 
@@ -39,7 +39,7 @@ Request:
 
 ```json
 {
-  "username": "alice",
+  "username": "demo",
   "password": "example-password"
 }
 ```
@@ -50,12 +50,12 @@ Response: `200 OK`, with the session cookie set.
 {
   "user": {
     "id": "11111111-1111-4111-8111-111111111111",
-    "username": "alice"
+    "username": "demo"
   }
 }
 ```
 
-Missing fields return `400 VALIDATION_ERROR`. Unknown usernames and incorrect passwords both return `401 INVALID_CREDENTIALS` with the same generic message. Login attempts are rate-limited; exceeded limits return `429 RATE_LIMITED` with `Retry-After`.
+Missing fields, blank usernames, usernames longer than 128 UTF-8 bytes, and passwords outside 1–72 UTF-8 bytes return `400 VALIDATION_ERROR`. Bodies must contain a single JSON object with no unknown fields and fit within 16 KiB. Unknown usernames and incorrect passwords both return `401 INVALID_CREDENTIALS` with the same generic message. Login attempts are limited to 10 per direct client IP per minute, including invalid login bodies. Exceeded limits return `429 RATE_LIMITED` with `Retry-After`. The in-memory limiter holds at most 1,024 active client windows and rejects new clients when full until windows expire; it resets on process restart and does not trust forwarded IP headers.
 
 ### POST /api/auth/logout
 
@@ -175,7 +175,7 @@ Lifecycle updates are periodic, so status may briefly lag a time boundary. The f
 
 ### GET /api/ws
 
-Direct local URL: `ws://localhost:8080/api/ws`. HTTPS deployments use `wss`. Browser handshakes must use the configured frontend origin. Non-browser test clients supply that origin as well.
+Direct local URL: `ws://localhost:8080/api/ws`. HTTPS deployments use `wss`. Browser handshakes must use one of the configured origins. Non-browser test clients supply an allowed origin as well.
 
 The connection carries public device-status updates only. The server broadcasts to all connected clients after a status change is committed:
 

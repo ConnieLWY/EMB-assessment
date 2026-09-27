@@ -1,0 +1,354 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Live charger status and reservation application API. Sign in through POST /api/auth/login; the browser sends the HttpOnly session cookie automatically. Mutation requests require an allowed Origin.",
+        "title": "EV Charger API",
+        "contact": {},
+        "version": "0.2.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/api/auth/login": {
+            "post": {
+                "description": "Use demo or demo2 with DemoPass123!. The browser stores the HttpOnly ev_session cookie for 24 hours. A successful login replaces the previous browser session. CLI clients must send an allowed Origin. Login attempts are limited to 10 per direct client IP per minute.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Sign in",
+                "operationId": "login",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Signed in",
+                        "schema": {
+                            "$ref": "#/definitions/auth.UserResponse"
+                        },
+                        "headers": {
+                            "Cache-Control": {
+                                "type": "string",
+                                "description": "no-store"
+                            },
+                            "Set-Cookie": {
+                                "type": "string",
+                                "description": "HttpOnly ev_session cookie; Secure when API_ORIGIN uses HTTPS"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "VALIDATION_ERROR: invalid JSON or login fields",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "INVALID_CREDENTIALS: invalid username or password",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "ORIGIN_NOT_ALLOWED: missing or untrusted Origin",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "PAYLOAD_TOO_LARGE: body exceeds 16 KiB",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "UNSUPPORTED_MEDIA_TYPE: use application/json",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED: login attempt limit or limiter capacity reached",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        },
+                        "headers": {
+                            "Retry-After": {
+                                "type": "integer",
+                                "description": "Seconds until another attempt may be made"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR: unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/logout": {
+            "post": {
+                "description": "Invalidates the current session and clears its cookie. Also succeeds when already signed out. Requires an allowed Origin.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Sign out",
+                "operationId": "logout",
+                "responses": {
+                    "204": {
+                        "description": "Signed out; no response body",
+                        "headers": {
+                            "Set-Cookie": {
+                                "type": "string",
+                                "description": "Clears ev_session with Max-Age=0"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "ORIGIN_NOT_ALLOWED: missing or untrusted Origin",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR: unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/me": {
+            "get": {
+                "description": "Requires the HttpOnly ev_session cookie set by POST /api/auth/login. Run login first; the browser sends its cookie automatically. Swagger 2.0 cannot model cookie authentication as a security scheme, so no manual token input is provided.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Get the signed-in user",
+                "operationId": "getCurrentUser",
+                "responses": {
+                    "200": {
+                        "description": "Current signed-in user",
+                        "schema": {
+                            "$ref": "#/definitions/auth.UserResponse"
+                        },
+                        "headers": {
+                            "Cache-Control": {
+                                "type": "string",
+                                "description": "no-store"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED: missing, invalid, or expired session",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "ORIGIN_NOT_ALLOWED: untrusted Origin",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR: unexpected server error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/chargers": {
+            "get": {
+                "description": "Returns all chargers ordered by ID, or an empty array. Current device status does not guarantee availability for future time slots. No authentication is required.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chargers"
+                ],
+                "summary": "List chargers",
+                "operationId": "listChargers",
+                "responses": {
+                    "200": {
+                        "description": "Current charger list",
+                        "schema": {
+                            "$ref": "#/definitions/charger.ChargerList"
+                        }
+                    },
+                    "403": {
+                        "description": "ORIGIN_NOT_ALLOWED: untrusted Origin",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR: the charger list could not be retrieved",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "auth.LoginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "description": "Password length must be 1–72 UTF-8 bytes.",
+                    "type": "string",
+                    "format": "password",
+                    "maxLength": 72,
+                    "minLength": 1,
+                    "example": "DemoPass123!"
+                },
+                "username": {
+                    "description": "Case-sensitive username, at most 128 UTF-8 bytes.",
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "example": "demo"
+                }
+            }
+        },
+        "auth.User": {
+            "type": "object",
+            "required": [
+                "id",
+                "username"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "11111111-1111-4111-8111-111111111111"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "demo"
+                }
+            }
+        },
+        "auth.UserResponse": {
+            "type": "object",
+            "required": [
+                "user"
+            ],
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/auth.User"
+                }
+            }
+        },
+        "charger.Charger": {
+            "type": "object",
+            "required": [
+                "id",
+                "location",
+                "name",
+                "status",
+                "updated_at"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "charger-1"
+                },
+                "location": {
+                    "type": "string",
+                    "example": "Level 1, Bay A"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Charger 1"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "AVAILABLE",
+                        "CHARGING",
+                        "MAINTENANCE"
+                    ],
+                    "example": "AVAILABLE"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-09-27T10:00:00Z"
+                }
+            }
+        },
+        "charger.ChargerList": {
+            "type": "object",
+            "required": [
+                "chargers"
+            ],
+            "properties": {
+                "chargers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/charger.Charger"
+                    }
+                }
+            }
+        },
+        "httpapi.ErrorDetail": {
+            "type": "object",
+            "required": [
+                "code",
+                "message"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "INTERNAL_ERROR"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "An unexpected error occurred."
+                }
+            }
+        },
+        "httpapi.ErrorResponse": {
+            "type": "object",
+            "required": [
+                "error"
+            ],
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/httpapi.ErrorDetail"
+                }
+            }
+        }
+    }
+}

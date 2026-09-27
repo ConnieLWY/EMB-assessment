@@ -13,9 +13,10 @@
     <script src="./swagger-ui-bundle.js"></script>
     <script>
       SwaggerUIBundle({
-        url: "./openapi.json",
+        url: "./swagger.json",
         dom_id: "#swagger-ui",
         deepLinking: true,
+        withCredentials: true,
         validatorUrl: null,
         presets: [SwaggerUIBundle.presets.apis]
       });

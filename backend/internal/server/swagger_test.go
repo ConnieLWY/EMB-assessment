@@ -16,7 +16,7 @@ func TestSwaggerRoutes(t *testing.T) {
 		{"/swagger/", "text/html"},
 		{"/swagger/swagger-ui.css", "text/css"},
 		{"/swagger/swagger-ui-bundle.js", "javascript"},
-		{"/swagger/openapi.json", "application/json"},
+		{"/swagger/swagger.json", "application/json"},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			rec := httptest.NewRecorder()
@@ -39,37 +39,42 @@ func TestSwaggerRoutes(t *testing.T) {
 	}
 }
 
-func TestOpenAPIContract(t *testing.T) {
+func TestSwaggerContract(t *testing.T) {
 	rec := httptest.NewRecorder()
-	server.NewRouter(server.Dependencies{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/swagger/openapi.json", nil))
+	server.NewRouter(server.Dependencies{}).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/swagger/swagger.json", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d", rec.Code)
 	}
 	var doc struct {
-		OpenAPI string `json:"openapi"`
-		Servers []struct {
-			URL string `json:"url"`
-		} `json:"servers"`
-		Paths map[string]map[string]struct {
+		Swagger  string   `json:"swagger"`
+		Host     string   `json:"host"`
+		BasePath string   `json:"basePath"`
+		Schemes  []string `json:"schemes"`
+		Paths    map[string]map[string]struct {
 			Responses map[string]json.RawMessage `json:"responses"`
 		} `json:"paths"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
 		t.Fatal(err)
 	}
-	if doc.OpenAPI != "3.0.3" {
-		t.Fatalf("OpenAPI version=%q", doc.OpenAPI)
+	if doc.Swagger != "2.0" {
+		t.Fatalf("Swagger version=%q", doc.Swagger)
 	}
-	if len(doc.Servers) != 1 || doc.Servers[0].URL != "/" {
-		t.Fatalf("servers=%+v", doc.Servers)
+	if doc.Host != "" || doc.BasePath != "/" || len(doc.Schemes) != 0 {
+		t.Fatalf("expected current origin, got host=%q basePath=%q schemes=%v", doc.Host, doc.BasePath, doc.Schemes)
 	}
 	operation, ok := doc.Paths["/api/chargers"]["get"]
-	if !ok || len(doc.Paths) != 1 {
+	if !ok {
 		t.Fatalf("documented paths=%v", doc.Paths)
 	}
 	for _, status := range []string{"200", "500"} {
 		if _, ok := operation.Responses[status]; !ok {
 			t.Errorf("missing response %s", status)
+		}
+	}
+	for path, method := range map[string]string{"/api/auth/login": "post", "/api/auth/logout": "post", "/api/auth/me": "get"} {
+		if _, ok := doc.Paths[path][method]; !ok {
+			t.Errorf("missing documented endpoint %s %s", method, path)
 		}
 	}
 }

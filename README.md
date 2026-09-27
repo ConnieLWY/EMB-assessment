@@ -37,9 +37,44 @@ Use one backend at a time to avoid port conflicts. Set `HTTP_ADDR` to override i
 
 Open [Swagger UI](http://localhost:8080/swagger/) after starting the backend. Expand `GET /api/chargers`, select **Try it out**, then **Execute** to query the running database.
 
-The [OpenAPI document](backend/internal/apidocs/openapi.json) is served at `/swagger/openapi.json`. Swagger UI assets are bundled with the Go backend, so browser access requires no external CDN or separate documentation container. API requests use the same origin as the documentation page.
+The generated [Swagger document](backend/internal/apidocs/swagger.json) is served at `/swagger/swagger.json`. Swagger UI assets are bundled with the Go backend, so browser access requires no external CDN or separate documentation container. API requests use the same origin as the documentation page.
 
-Update the OpenAPI document alongside each new endpoint. [API.md](API.md) describes the complete application contract; Swagger UI exposes the available endpoints.
+API documentation is generated from handler annotations and the Go request/response types using `swag` v1.16.6, pinned as a Go tool in `backend/go.mod`. Update those sources and regenerate from the repository root:
+
+```sh
+cd backend
+go generate ./cmd/server
+```
+
+Commit the generated `swagger.json` with its source changes; do not edit it manually. Docker builds run generation automatically. The generator scans the auth, charger, and shared HTTP packages listed in the `go:generate` directive; add a package there when introducing a new handler package.
+
+The generated format is Swagger 2.0. Cookie authentication is described on the login and identity endpoints because Swagger 2.0 has no native cookie security scheme. The browser still sends the HttpOnly cookie normally after login. [API.md](API.md) describes the complete application contract; Swagger UI exposes the available endpoints.
+
+## Login and Sessions
+
+In Swagger UI, execute `POST /api/auth/login` using `demo` or `demo2` and the demo password `DemoPass123!`. Then execute `GET /api/auth/me` to see the signed-in user, followed by `POST /api/auth/logout` to sign out. The browser manages the HttpOnly session cookie automatically; no token needs to be entered into Swagger's Authorize dialog.
+
+Sessions last 24 hours. The database stores SHA-256 hashes of random tokens, never the raw cookie values. A successful login replaces the browser's previous session; a failed login leaves it intact. Logout invalidates the server-side session and clears the cookie.
+
+`FRONTEND_ORIGIN` defaults to `http://localhost:3000`, and `API_ORIGIN` defaults to `http://localhost:8080` so Swagger can submit same-origin requests. Only these explicit origins are accepted. Set both values to the externally visible origins when deploying; an HTTPS `API_ORIGIN` enables Secure cookies. Use `localhost` consistently for local testing. Command-line mutations must include an allowed `Origin` header.
+
+Example using a local cookie file:
+
+```sh
+curl -i -c /tmp/ev-charger-cookies.txt \
+  -H 'Origin: http://localhost:8080' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo","password":"DemoPass123!"}' \
+  http://localhost:8080/api/auth/login
+
+curl -b /tmp/ev-charger-cookies.txt http://localhost:8080/api/auth/me
+
+curl -i -b /tmp/ev-charger-cookies.txt -c /tmp/ev-charger-cookies.txt \
+  -H 'Origin: http://localhost:8080' -X POST \
+  http://localhost:8080/api/auth/logout
+```
+
+Login is limited to 10 attempts per direct client IP per minute. The bounded in-memory limiter is intended for the single-backend assessment; it resets on restart and does not use untrusted forwarded IP headers. Requests beyond the limit return `429` with a `Retry-After` header.
 
 ## Migrations and Seed Data
 
@@ -47,11 +82,12 @@ SQL migrations live in `migrations/` and use paired `.up.sql` and `.down.sql` fi
 
 - `000001_schema`: creates users, login sessions, chargers, reservations, charging sessions, and their constraints.
 - `000002_seed`: adds three chargers and two demo users. `charger-1` and `charger-2` start available; `charger-3` starts in maintenance.
+- `000003_generic_demo_usernames`: assigns the generic login names `demo` and `demo2` to the seeded accounts, including existing databases.
 
 | Username | User ID | Demo password |
 | --- | --- | --- |
-| `alice` | `11111111-1111-4111-8111-111111111111` | `DemoPass123!` |
-| `bob` | `22222222-2222-4222-8222-222222222222` | `DemoPass123!` |
+| `demo` | `11111111-1111-4111-8111-111111111111` | `DemoPass123!` |
+| `demo2` | `22222222-2222-4222-8222-222222222222` | `DemoPass123!` |
 
 Passwords are stored as bcrypt hashes. Rolling back seed data is permitted only when it has no dependent application records; foreign keys prevent silently deleting reservations or sessions. Schema rollback removes application tables and is intended for disposable databases.
 
@@ -68,6 +104,8 @@ TEST_DATABASE_URL='postgres://ev_test:local-test-only@localhost:55433/ev_charger
 The test fixture requires a database URL whose database name ends in `_test`. Each test creates its own randomly named database on that test server, runs the real migration CLI, and drops only that temporary database afterward. The test account therefore needs database creation permission. A missing test database configuration fails the test instead of silently skipping it.
 
 Tests cover migration application and rollback, seed password verification, non-overlapping reservation intervals, adjacent slots, one unfinished charging session per charger, matching charger references, configuration validation, and HTTP charger listing with empty and database-error responses.
+
+Authentication tests cover login and logout, session expiry and rotation, rollback after a failed session replacement, token hashing, private response headers, validation, origin checks, credentialed CORS, Secure cookies, database failures, and concurrent rate limiting.
 
 ## Assessment Requirements
 

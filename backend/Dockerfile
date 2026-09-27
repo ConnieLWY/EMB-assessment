@@ -3,6 +3,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+RUN go generate ./cmd/server
 RUN CGO_ENABLED=0 go build -trimpath -o /server ./cmd/server
 
 FROM scratch

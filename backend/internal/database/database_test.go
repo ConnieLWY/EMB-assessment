@@ -32,10 +32,10 @@ func TestMigrations(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty); err != nil {
 		t.Fatal(err)
 	}
-	if version != 2 || dirty {
+	if version != 3 || dirty {
 		t.Fatalf("migration version=%d dirty=%v", version, dirty)
 	}
-	for _, username := range []string{"alice", "bob"} {
+	for _, username := range []string{"demo", "demo2"} {
 		var hash string
 		if err := pool.QueryRow(ctx, "SELECT password_hash FROM users WHERE username=$1", username).Scan(&hash); err != nil {
 			t.Fatal(err)
@@ -44,7 +44,7 @@ func TestMigrations(t *testing.T) {
 			t.Fatalf("invalid demo password for %s: %v", username, err)
 		}
 	}
-	testutil.Migrate(t, dsn, "down", "1")
+	testutil.Migrate(t, dsn, "down", "2")
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM chargers").Scan(&chargers); err != nil {
 		t.Fatal(err)
 	}
