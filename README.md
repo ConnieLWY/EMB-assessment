@@ -7,6 +7,25 @@ A technical assessment project for a Go backend, React TypeScript frontend, Post
 - [Database ERD](ERD.md)
 - [API Contract](API.md)
 
+## Run the Complete Application
+
+Prerequisite: Docker with Docker Compose. From the repository root:
+
+```sh
+docker compose up --build -d --wait
+```
+
+Open the dashboard at `http://localhost:3000`. The backend API and Swagger UI remain available at `http://localhost:8080/api/chargers` and `http://localhost:8080/swagger/`. The frontend container serves the production React build through nginx; nginx proxies `/api` requests and WebSocket upgrades to the backend. Stop a separately running Vite server before using the default frontend port.
+
+The default local ports are `3000` for the frontend, `8080` for the backend, `55432` for the development database, and `55433` for the optional test database. `.env.example` lists configuration values; copy it to `.env` to override Compose defaults. The included passwords are public local demonstration values, not production credentials. Compose waits for PostgreSQL to be healthy, applies SQL migrations through a one-shot `migrate` service, and then starts the backend and frontend. Database state persists in the `postgres_data` volume.
+
+```sh
+docker compose logs -f frontend backend
+docker compose down
+```
+
+`down` stops containers without deleting the database volume. After adding migrations to an existing checkout, run `docker compose run --rm migrate` to apply them before restarting the backend.
+
 ## Run the Backend
 
 Prerequisites: Docker with Docker Compose. Local Go development also requires Go 1.27 or later and the [golang-migrate CLI](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate) v4.20.1.
@@ -20,10 +39,6 @@ docker compose logs -f backend
 ```
 
 Each `/api/` request logs its HTTP method, path, status, and `duration_ms`. A WebSocket connection logs its `101` handshake immediately. Request bodies, query strings, and cookies are excluded from access logs.
-
-Compose waits for PostgreSQL to be healthy, applies SQL migrations through a one-shot `migrate` service, and starts the backend only after migration success. Database state persists in the `postgres_data` volume. `docker compose down` stops the services without removing that volume.
-
-The default local ports are `8080` for the backend, `55432` for the development database, and `55433` for the separate test database. `.env.example` lists the configuration values; copy it to `.env` to override Compose defaults. The included passwords are public local demonstration values, not production credentials.
 
 To run Go directly instead of the backend container:
 
@@ -57,6 +72,38 @@ npm run build
 ```
 
 See [frontend/README.md](frontend/README.md) for frontend behavior and local development details.
+
+## End-to-End Demo
+
+1. Open the dashboard in two separate browser sessions. Sign in as `demo` in one and `demo2` in the other; both use `DemoPass123!`.
+2. Watch the three seeded chargers update without reloading. Leave one charger unreserved so its simulated `AVAILABLE`, `CHARGING`, and `MAINTENANCE` changes remain visible.
+3. Choose a charger that is not in maintenance and book a future time using `demo`. Submit the same charger and time interval using `demo2`; the second request shows an explicit `409` conflict. Each user sees only their own reservations.
+4. Cancel a scheduled reservation to release its slot, or use a near-future reservation to watch `SCHEDULED`, `ACTIVE`, and `COMPLETED`. Active charging cannot be cancelled.
+5. Restart the backend with `docker compose restart backend`. The browser reconnects its live feed, and the reservation remains visible after signing in again.
+
+The simulator ticks every 12 seconds and reservation lifecycle reconciliation runs every second. A charger currently in maintenance rejects new bookings; wait for it to return to available or choose another charger. Times in the form and reservation list use the browser's local time zone.
+
+## Fresh Verification Without Touching Existing Data
+
+Use a separate Compose project name and ports to get a new database volume while leaving the default project intact. Create an ignored `.env.verify` file in the repository root:
+
+```dotenv
+DB_PASSWORD=local-dev-only
+DB_PORT=56432
+BACKEND_PORT=8180
+FRONTEND_PORT=3300
+FRONTEND_ORIGIN=http://localhost:3300
+API_ORIGIN=http://localhost:8180
+```
+
+Then run:
+
+```sh
+docker compose -p ev-charger-review --env-file .env.verify up --build -d --wait
+docker compose -p ev-charger-review --env-file .env.verify ps
+```
+
+Open `http://localhost:3300`. The isolated API is at `http://localhost:8180`. `docker compose -p ev-charger-review --env-file .env.verify down` retains that project's data. Use `down --volumes` only when you intend to discard this isolated project's test database; it does not target the default project's volume.
 
 ## Swagger UI
 
@@ -127,6 +174,13 @@ cd backend
 TEST_DATABASE_URL='postgres://ev_test:local-test-only@localhost:55433/ev_charger_test?sslmode=disable' go test -race ./... -count=1
 ```
 
+Run the two named assessment tests individually from `backend/` with the same dedicated `TEST_DATABASE_URL`:
+
+```sh
+TEST_DATABASE_URL='postgres://ev_test:local-test-only@localhost:55433/ev_charger_test?sslmode=disable' go test ./tests -run '^TestConcurrentReservations$' -count=1
+TEST_DATABASE_URL='postgres://ev_test:local-test-only@localhost:55433/ev_charger_test?sslmode=disable' go test ./internal/charger -run '^TestChargerStatusSimulation$' -count=1
+```
+
 The test fixture requires a database URL whose database name ends in `_test`. Each test creates its own randomly named database on that test server, runs the real migration CLI, and drops only that temporary database afterward. The test account therefore needs database creation permission. A missing test database configuration fails the test instead of silently skipping it.
 
 Tests cover migration application and rollback, seed password verification, non-overlapping reservation intervals, adjacent slots, one unfinished charging session per charger, matching charger references, configuration validation, and HTTP charger listing with empty and database-error responses.
@@ -142,7 +196,7 @@ The Go tests must include:
 - `TestConcurrentReservations`: 10 concurrent HTTP requests for the same slot on `charger-1`, with exactly one `201 Created` and nine `409 Conflict` responses.
 - `TestChargerStatusSimulation`: verify persisted status changes and emitted update events.
 
-The deliverable will retain `backend/`, `frontend/`, `migrations/`, `docker-compose.yml`, and this README at the repository root.
+The repository contains `backend/`, `frontend/`, `migrations/`, `docker-compose.yml`, and this README at the repository root.
 
 ## Assumptions & Trade-offs
 

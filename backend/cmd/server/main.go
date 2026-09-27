@@ -53,7 +53,7 @@ func run() error {
 	checkCtx, checkCancel := context.WithTimeout(ctx, 5*time.Second)
 	err = pool.QueryRow(checkCtx, "SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty)
 	checkCancel()
-	if err != nil || dirty || version < 3 {
+	if err != nil || dirty || version < 4 {
 		return errors.New("database migrations must complete before backend startup")
 	}
 	hub := realtime.NewHub(cfg.FrontendOrigin, cfg.APIOrigin)

@@ -2,6 +2,8 @@
 
 The React and TypeScript frontend shows the seeded chargers, follows live device status over WebSocket, and lets a signed-in user reserve a future time slot or cancel an unstarted reservation.
 
+For the complete application in containers, run `docker compose up --build -d --wait` from the repository root and open `http://localhost:3000`. The production build is served by nginx, which proxies `/api` and WebSocket upgrades to the backend.
+
 ## Local development
 
 Start the database and backend from the repository root, then run:
