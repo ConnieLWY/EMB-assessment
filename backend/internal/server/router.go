@@ -44,6 +44,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	authHandler := auth.NewHandler(auth.NewService(deps.Pool, deps.Now), deps.CookieSecure)
 	mux.Handle("POST /api/chargers/{id}/reserve", authHandler.RequireUser(http.HandlerFunc(handler.Reserve)))
 	mux.Handle("GET /api/reservations", authHandler.RequireUser(http.HandlerFunc(handler.ListReservations)))
+	mux.Handle("POST /api/reservations/{id}/cancel", authHandler.RequireUser(http.HandlerFunc(handler.CancelReservation)))
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
 	mux.Handle("GET /api/auth/me", authHandler.RequireUser(http.HandlerFunc(authHandler.Me)))

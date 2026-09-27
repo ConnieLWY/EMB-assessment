@@ -37,7 +37,7 @@ erDiagram
         text charger_id FK
         timestamptz start_time
         timestamptz end_time
-        text status "SCHEDULED / WAITING / ACTIVE / COMPLETED / EXPIRED"
+        text status "SCHEDULED / WAITING / ACTIVE / COMPLETED / EXPIRED / CANCELLED"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -53,7 +53,7 @@ erDiagram
 
 ## Constraints and Relationships
 
-- Reservation intervals `[start_time, end_time)` must not overlap for the same charger. `end_time` must be later than `start_time`.
+- Non-cancelled reservation intervals `[start_time, end_time)` must not overlap for the same charger. Cancelled rows stay in history without holding their former time slots. `end_time` must be later than `start_time`.
 - Each charger may have at most one unfinished charging session.
 - Each reservation may have at most one charging session. A null `reservation_id` indicates random simulated use; otherwise, the user is identified through the linked reservation.
 - A session linked to a reservation must belong to the same charger as that reservation.

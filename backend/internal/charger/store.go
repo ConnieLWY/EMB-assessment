@@ -85,7 +85,7 @@ func (s *Store) reserve(ctx context.Context, actorID, chargerID string, start, e
 	}
 	var conflict bool
 	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM reservations WHERE charger_id=$1
-		AND tstzrange(start_time, end_time, '[)') && tstzrange($2, $3, '[)'))`, chargerID, start, end).Scan(&conflict)
+		AND status <> 'CANCELLED' AND tstzrange(start_time, end_time, '[)') && tstzrange($2, $3, '[)'))`, chargerID, start, end).Scan(&conflict)
 	if err != nil {
 		return Reservation{}, err
 	}
@@ -101,6 +101,45 @@ func (s *Store) reserve(ctx context.Context, actorID, chargerID string, start, e
 		if errors.As(err, &pgErr) && pgErr.Code == "23P01" {
 			return Reservation{}, ErrReservationConflict
 		}
+		return Reservation{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Reservation{}, err
+	}
+	r.UTC()
+	return r, nil
+}
+
+func (s *Store) cancelReservation(ctx context.Context, actorID, reservationID string, now time.Time) (Reservation, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return Reservation{}, err
+	}
+	defer tx.Rollback(ctx)
+	var chargerID string
+	err = tx.QueryRow(ctx, "SELECT charger_id FROM reservations WHERE id=$1 AND user_id=$2", reservationID, actorID).Scan(&chargerID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Reservation{}, ErrReservationNotFound
+	}
+	if err != nil {
+		return Reservation{}, err
+	}
+	var lockedID string
+	if err := tx.QueryRow(ctx, "SELECT id FROM chargers WHERE id=$1 FOR UPDATE", chargerID).Scan(&lockedID); err != nil {
+		return Reservation{}, err
+	}
+	var status string
+	if err := tx.QueryRow(ctx, "SELECT status FROM reservations WHERE id=$1 AND user_id=$2 FOR UPDATE", reservationID, actorID).Scan(&status); err != nil {
+		return Reservation{}, err
+	}
+	if status != "SCHEDULED" && status != "WAITING" {
+		return Reservation{}, ErrReservationNotCancellable
+	}
+	var r Reservation
+	err = tx.QueryRow(ctx, `UPDATE reservations SET status='CANCELLED', updated_at=$2 WHERE id=$1
+		RETURNING id,user_id,charger_id,start_time,end_time,status,created_at,updated_at`, reservationID, now).
+		Scan(&r.ID, &r.UserID, &r.ChargerID, &r.StartTime, &r.EndTime, &r.Status, &r.CreatedAt, &r.UpdatedAt)
+	if err != nil {
 		return Reservation{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {

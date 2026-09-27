@@ -100,10 +100,39 @@ func (h *Handler) ListReservations(w http.ResponseWriter, r *http.Request) {
 	httpapi.JSON(w, 200, ReservationList{Reservations: reservations})
 }
 
+// CancelReservation cancels an unstarted reservation owned by the signed-in user.
+// @Summary Cancel my reservation
+// @Description Cancels a scheduled or waiting reservation. Active charging sessions cannot be cancelled.
+// @Tags Reservations
+// @ID cancelReservation
+// @Produce json
+// @Param id path string true "Reservation ID"
+// @Success 200 {object} ReservationResponse "Reservation cancelled"
+// @Failure 400 {object} httpapi.ErrorResponse "VALIDATION_ERROR"
+// @Failure 401 {object} httpapi.ErrorResponse "UNAUTHENTICATED"
+// @Failure 403 {object} httpapi.ErrorResponse "ORIGIN_NOT_ALLOWED"
+// @Failure 404 {object} httpapi.ErrorResponse "RESERVATION_NOT_FOUND"
+// @Failure 409 {object} httpapi.ErrorResponse "RESERVATION_NOT_CANCELLABLE"
+// @Failure 500 {object} httpapi.ErrorResponse "INTERNAL_ERROR"
+// @Router /api/reservations/{id}/cancel [post]
+func (h *Handler) CancelReservation(w http.ResponseWriter, r *http.Request) {
+	user, _ := auth.UserFromContext(r.Context())
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	reservation, err := h.service.CancelReservation(ctx, user.ID, r.PathValue("id"))
+	if err != nil {
+		reservationError(w, r, err)
+		return
+	}
+	httpapi.JSON(w, http.StatusOK, ReservationResponse{Reservation: reservation})
+}
+
 func reservationError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, ErrValidation):
 		httpapi.Error(w, 400, "VALIDATION_ERROR", "Provide a valid user ID and future time interval.")
+	case errors.Is(err, ErrInvalidReservationID):
+		httpapi.Error(w, 400, "VALIDATION_ERROR", "Provide a valid reservation ID.")
 	case errors.Is(err, ErrUserMismatch):
 		httpapi.Error(w, 403, "USER_ID_MISMATCH", "Reservation user ID must match the signed-in user.")
 	case errors.Is(err, ErrChargerNotFound):
@@ -114,6 +143,10 @@ func reservationError(w http.ResponseWriter, r *http.Request, err error) {
 		httpapi.Error(w, 409, "CHARGER_OCCUPIED", "This charger is occupied for the selected time slot.")
 	case errors.Is(err, ErrMaintenance):
 		httpapi.Error(w, 409, "CHARGER_IN_MAINTENANCE", "This charger is currently in maintenance.")
+	case errors.Is(err, ErrReservationNotFound):
+		httpapi.Error(w, 404, "RESERVATION_NOT_FOUND", "Reservation not found.")
+	case errors.Is(err, ErrReservationNotCancellable):
+		httpapi.Error(w, 409, "RESERVATION_NOT_CANCELLABLE", "Only scheduled or waiting reservations can be cancelled.")
 	default:
 		slog.ErrorContext(r.Context(), "reservation request failed", "error", err)
 		httpapi.Error(w, 500, "INTERNAL_ERROR", "An unexpected error occurred.")

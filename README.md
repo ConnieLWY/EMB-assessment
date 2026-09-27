@@ -36,6 +36,28 @@ DATABASE_URL='postgres://ev_app:local-dev-only@localhost:55432/ev_charger?sslmod
 
 Use one backend at a time to avoid port conflicts. Set `HTTP_ADDR` to override its default `:8080` listener.
 
+## Run the Frontend
+
+With the backend running, start the React development server in a second terminal:
+
+```sh
+cd frontend
+npm ci
+npm run dev
+```
+
+Open `http://localhost:3000`. The development server proxies REST and WebSocket requests under `/api` to the backend, so the browser uses one origin for its session cookie. Sign in with `demo` or `demo2` and `DemoPass123!` to reserve a charger and view your bookings. The dashboard continues to show public live status without a login.
+
+Frontend checks:
+
+```sh
+cd frontend
+npm test -- --run
+npm run build
+```
+
+See [frontend/README.md](frontend/README.md) for frontend behavior and local development details.
+
 ## Swagger UI
 
 Open [Swagger UI](http://localhost:8080/swagger/) after starting the backend. Expand `GET /api/chargers`, select **Try it out**, then **Execute** to query the running database.
@@ -86,6 +108,7 @@ SQL migrations live in `migrations/` and use paired `.up.sql` and `.down.sql` fi
 - `000001_schema`: creates users, login sessions, chargers, reservations, charging sessions, and their constraints.
 - `000002_seed`: adds three chargers and two demo users. `charger-1` and `charger-2` start available; `charger-3` starts in maintenance.
 - `000003_generic_demo_usernames`: assigns the generic login names `demo` and `demo2` to the seeded accounts, including existing databases.
+- `000004_cancel_reservations`: adds the cancelled reservation state and releases cancelled intervals from the database overlap constraint.
 
 | Username | User ID | Demo password |
 | --- | --- | --- |
@@ -149,6 +172,8 @@ The following assumptions and trade-offs define behavior left unspecified by the
 - **A charger currently in maintenance rejects all new reservations, including future ones.** This is conservative because the mock system has no maintenance completion estimate.
 
 ### Reservation lifecycle
+
+- **Users can cancel their own `SCHEDULED` or `WAITING` reservations.** The history row becomes `CANCELLED` and its time slot becomes bookable again. `ACTIVE` charging is not stopped by cancellation. A cancelled booking does not change device status or produce a WebSocket device event.
 
 - **Charging starts automatically at the reservation's start time when the charger is free.** No arrival, plug-in, or manual start step is modeled. This is a demonstration assumption, not a statement that booking a real charger starts power delivery.
 - **The associated simulated session ends at the reservation's end time.** Back-to-back reservations transfer use without an intermediate available state; otherwise the charger returns to `AVAILABLE`.

@@ -21,6 +21,7 @@
 | GET | `/api/chargers` | Public | `200` |
 | POST | `/api/chargers/{id}/reserve` | Required | `201` |
 | GET | `/api/reservations` | Required; current user's reservations only | `200` |
+| POST | `/api/reservations/{id}/cancel` | Required; owner only | `200` |
 | GET | `/api/ws` | Public; device status only | `101` |
 
 ## Authentication
@@ -168,8 +169,15 @@ Return only the authenticated user's reservations, ordered by `start_time` desce
 | `ACTIVE` | The reservation's simulated charging session has started |
 | `COMPLETED` | The reservation's charging session has ended |
 | `EXPIRED` | The booked period ended without the reservation starting |
+| `CANCELLED` | The user cancelled before simulated charging started; the slot is released |
 
-Lifecycle updates are periodic, so status may briefly lag a time boundary. The frontend refreshes this collection after booking, on login, on reconnect, and every five seconds while the authenticated page is visible. Polling is stopped on logout; a `401` clears private client state. Device events alone cannot communicate all reservation changes, including back-to-back reservations that keep a charger in `CHARGING`.
+Lifecycle updates are periodic, so status may briefly lag a time boundary. The frontend refreshes this collection after booking or cancellation, on login, on reconnect, and every five seconds while the authenticated page is visible. Polling is stopped on logout; a `401` clears private client state. Device events alone cannot communicate all reservation changes, including back-to-back reservations that keep a charger in `CHARGING`.
+
+### POST /api/reservations/{id}/cancel
+
+Cancel a reservation owned by the signed-in user. Only `SCHEDULED` and `WAITING` reservations can be cancelled. `ACTIVE`, `COMPLETED`, `EXPIRED`, and already cancelled reservations return `409 RESERVATION_NOT_CANCELLABLE`. A missing reservation or one owned by another user returns `404 RESERVATION_NOT_FOUND`; an invalid UUID returns `400 VALIDATION_ERROR`. The endpoint requires the same session cookie and allowed `Origin` as other mutations. It accepts no body.
+
+Success returns `200 OK` with `{ "reservation": ... }` and status `CANCELLED`. The record remains in the user's history, but the interval no longer blocks another reservation. Cancellation does not change current charger status or emit a device-status event. The frontend refreshes the private reservation list after success.
 
 ## WebSocket
 

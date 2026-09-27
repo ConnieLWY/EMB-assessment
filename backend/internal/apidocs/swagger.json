@@ -344,6 +344,72 @@
                 }
             }
         },
+        "/api/reservations/{id}/cancel": {
+            "post": {
+                "description": "Cancels a scheduled or waiting reservation. Active charging sessions cannot be cancelled.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reservations"
+                ],
+                "summary": "Cancel my reservation",
+                "operationId": "cancelReservation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Reservation ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reservation cancelled",
+                        "schema": {
+                            "$ref": "#/definitions/charger.ReservationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "VALIDATION_ERROR",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "ORIGIN_NOT_ALLOWED",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "RESERVATION_NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "RESERVATION_NOT_CANCELLABLE",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "INTERNAL_ERROR",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/ws": {
             "get": {
                 "description": "Public WebSocket stream of CHARGER_STATUS_UPDATED events. An allowed Origin is required. Clients do not send application messages. Swagger UI cannot open a WebSocket through Try it out.",
