@@ -12,10 +12,11 @@ import (
 
 	"ev-charger-assessment/backend/internal/config"
 	"ev-charger-assessment/backend/internal/database"
+	"ev-charger-assessment/backend/internal/realtime"
 	"ev-charger-assessment/backend/internal/server"
 )
 
-//go:generate go tool swag init -g main.go -d .,../../internal/auth,../../internal/charger,../../internal/httpapi --parseInternal --output ../../internal/apidocs --outputTypes json
+//go:generate go tool swag init -g main.go -d .,../../internal/auth,../../internal/charger,../../internal/httpapi,../../internal/realtime --parseInternal --output ../../internal/apidocs --outputTypes json
 
 // @title EV Charger API
 // @version 0.2.0
@@ -51,9 +52,11 @@ func run() error {
 	if err != nil || dirty || version < 3 {
 		return errors.New("database migrations must complete before backend startup")
 	}
+	hub := realtime.NewHub(cfg.FrontendOrigin, cfg.APIOrigin)
+	defer hub.Close()
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           server.NewRouter(server.Dependencies{Pool: pool, FrontendOrigin: cfg.FrontendOrigin, APIOrigin: cfg.APIOrigin, CookieSecure: cfg.CookieSecure}),
+		Handler:           server.NewRouter(server.Dependencies{Pool: pool, FrontendOrigin: cfg.FrontendOrigin, APIOrigin: cfg.APIOrigin, CookieSecure: cfg.CookieSecure, Hub: hub}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,

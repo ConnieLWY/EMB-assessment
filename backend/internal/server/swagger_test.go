@@ -72,7 +72,10 @@ func TestSwaggerContract(t *testing.T) {
 			t.Errorf("missing response %s", status)
 		}
 	}
-	for path, method := range map[string]string{"/api/auth/login": "post", "/api/auth/logout": "post", "/api/auth/me": "get"} {
+	for path, method := range map[string]string{
+		"/api/auth/login": "post", "/api/auth/logout": "post", "/api/auth/me": "get",
+		"/api/chargers/{id}/reserve": "post", "/api/reservations": "get", "/api/ws": "get",
+	} {
 		if _, ok := doc.Paths[path][method]; !ok {
 			t.Errorf("missing documented endpoint %s %s", method, path)
 		}

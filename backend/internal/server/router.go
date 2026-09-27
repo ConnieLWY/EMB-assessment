@@ -4,6 +4,7 @@ import (
 	"ev-charger-assessment/backend/internal/apidocs"
 	"ev-charger-assessment/backend/internal/auth"
 	"ev-charger-assessment/backend/internal/charger"
+	"ev-charger-assessment/backend/internal/realtime"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 	"time"
@@ -15,6 +16,7 @@ type Dependencies struct {
 	FrontendOrigin string
 	APIOrigin      string
 	CookieSecure   bool
+	Hub            *realtime.Hub
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -26,6 +28,10 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	mux := http.NewServeMux()
 	apidocs.RegisterRoutes(mux)
+	if deps.Hub == nil {
+		deps.Hub = realtime.NewHub(deps.FrontendOrigin, deps.APIOrigin)
+	}
+	mux.Handle("GET /api/ws", deps.Hub)
 	store := charger.NewStore(deps.Pool)
 	handler := charger.NewHandler(store, charger.NewService(store, deps.Now, nil))
 	mux.HandleFunc("GET /api/chargers", handler.List)

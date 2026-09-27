@@ -3,6 +3,7 @@ module ev-charger-assessment/backend
 go 1.27.0
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/swaggo/files/v2 v2.0.2
 	golang.org/x/crypto v0.57.0
