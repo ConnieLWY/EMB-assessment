@@ -12,7 +12,6 @@ interface Props {
 }
 
 export function ReservationDialog({ charger, user, onClose, onSuccess, onUnauthorized }: Props) {
-  const [userId, setUserId] = useState(user.id)
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +46,7 @@ export function ReservationDialog({ charger, user, onClose, onSuccess, onUnautho
       if (new Date(startTime).getTime() < Date.now()) throw new Error('Start time must be in the future.')
       if (endTime <= startTime) throw new Error('End time must be after start time.')
       setSubmitting(true)
-      const reservation = await api.reserve(charger.id, { user_id: userId.trim(), start_time: startTime, end_time: endTime })
+      const reservation = await api.reserve(charger.id, { user_id: user.id, start_time: startTime, end_time: endTime })
       onSuccess(reservation)
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) { onUnauthorized(); onClose(); return }
@@ -58,12 +57,12 @@ export function ReservationDialog({ charger, user, onClose, onSuccess, onUnautho
 
   return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
     <div className="reservation-dialog" ref={dialog} role="dialog" aria-modal="true" aria-labelledby="reservation-title">
-      <div className="dialog-topline"><span className="eyebrow">NEW RESERVATION</span><button className="icon-button" type="button" onClick={onClose} aria-label="Close reservation form">×</button></div>
+      <div className="dialog-topline"><span className="eyebrow">New reservation</span><button className="icon-button" type="button" onClick={onClose} aria-label="Close reservation form">×</button></div>
       <h2 id="reservation-title">Reserve {charger.name}</h2>
       <p className="dialog-subtitle">{charger.location}. Times are shown in your local time zone.</p>
       <form onSubmit={submit}>
         <label htmlFor="reservation-user">User ID</label>
-        <input id="reservation-user" ref={firstField} value={userId} onChange={(event) => setUserId(event.target.value)} required />
+        <input id="reservation-user" ref={firstField} value={user.id} readOnly />
         <div className="field-pair">
           <div><label htmlFor="reservation-start">Start time</label><input id="reservation-start" type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} required /></div>
           <div><label htmlFor="reservation-end">End time</label><input id="reservation-end" type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} required /></div>

@@ -12,16 +12,15 @@ const reservation: Reservation = { id: 'reservation-1', user_id: user.id, charge
 afterEach(() => vi.restoreAllMocks())
 
 describe('ReservationDialog', () => {
-  it('prefills an editable user ID and reports a successful reservation', async () => {
+  it('shows a read-only signed-in user ID and reports a successful reservation', async () => {
     const reserve = vi.spyOn(api, 'reserve').mockResolvedValue(reservation)
     const onSuccess = vi.fn()
     render(<ReservationDialog charger={charger} user={user} onClose={vi.fn()} onSuccess={onSuccess} onUnauthorized={vi.fn()} />)
     expect(screen.getByLabelText('User ID')).toHaveValue(user.id)
+    expect(screen.getByLabelText('User ID')).toHaveAttribute('readonly')
     const tomorrow = new Date(Date.now() + 86_400_000)
     const start = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}T14:00`
     const end = start.replace('T14:00', 'T15:00')
-    await userEvent.clear(screen.getByLabelText('User ID'))
-    await userEvent.type(screen.getByLabelText('User ID'), user.id)
     await userEvent.type(screen.getByLabelText('Start time'), start)
     await userEvent.type(screen.getByLabelText('End time'), end)
     await userEvent.click(screen.getByRole('button', { name: 'Confirm reservation' }))

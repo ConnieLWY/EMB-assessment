@@ -7,6 +7,16 @@ export class ApiError extends Error {
   }
 }
 
+export interface ReservationPage {
+  reservations: Reservation[]
+  page: number
+  limit: number
+  total: number
+}
+
+export type ReservationGroup = 'upcoming' | 'history'
+export const RESERVATION_PAGE_SIZE = 5
+
 async function request<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method,
@@ -31,7 +41,7 @@ export const api = {
   listChargers: async (signal?: AbortSignal) => (await request<{ chargers: Charger[] }>('/api/chargers', 'GET', undefined, signal)).chargers,
   reserve: async (chargerId: string, input: ReserveInput, signal?: AbortSignal) =>
     (await request<{ reservation: Reservation }>(`/api/chargers/${encodeURIComponent(chargerId)}/reserve`, 'POST', input, signal)).reservation,
-  listReservations: async (signal?: AbortSignal) => (await request<{ reservations: Reservation[] }>('/api/reservations', 'GET', undefined, signal)).reservations,
+  listReservations: (group: ReservationGroup, page = 1, signal?: AbortSignal) => request<ReservationPage>(`/api/reservations?group=${group}&page=${page}&limit=${RESERVATION_PAGE_SIZE}`, 'GET', undefined, signal),
   cancelReservation: async (id: string, signal?: AbortSignal) =>
     (await request<{ reservation: Reservation }>(`/api/reservations/${encodeURIComponent(id)}/cancel`, 'POST', undefined, signal)).reservation,
 }

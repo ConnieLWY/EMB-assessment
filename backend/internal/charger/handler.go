@@ -6,7 +6,9 @@ import (
 	"ev-charger-assessment/backend/internal/auth"
 	"ev-charger-assessment/backend/internal/httpapi"
 	"log/slog"
+	"math"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -79,25 +81,59 @@ func (h *Handler) Reserve(w http.ResponseWriter, r *http.Request) {
 
 // ListReservations returns the signed-in user's reservations.
 // @Summary List my reservations
-// @Description Returns only the signed-in user's reservations, ordered by start time descending.
+// @Description Returns only the signed-in user's reservations. Use group=upcoming for scheduled, waiting, and active reservations; group=history for completed, expired, and cancelled reservations. Groups are paginated independently.
 // @Tags Reservations
 // @ID listReservations
 // @Produce json
+// @Param page query int false "Page number, starting at 1" default(1)
+// @Param limit query int false "Page size, 1–100" default(5)
+// @Param group query string false "Reservation group" Enums(upcoming,history)
 // @Success 200 {object} ReservationList "Current user's reservations"
+// @Failure 400 {object} httpapi.ErrorResponse "VALIDATION_ERROR"
 // @Failure 401 {object} httpapi.ErrorResponse "UNAUTHENTICATED"
 // @Failure 403 {object} httpapi.ErrorResponse "ORIGIN_NOT_ALLOWED"
 // @Failure 500 {object} httpapi.ErrorResponse "INTERNAL_ERROR"
 // @Router /api/reservations [get]
 func (h *Handler) ListReservations(w http.ResponseWriter, r *http.Request) {
+	page, limit := 1, 5
+	group := ""
+	if values, ok := r.URL.Query()["group"]; ok {
+		if len(values) != 1 || (values[0] != "upcoming" && values[0] != "history") {
+			httpapi.Error(w, 400, "VALIDATION_ERROR", "Invalid reservation group.")
+			return
+		}
+		group = values[0]
+	}
+	for _, param := range []struct {
+		name  string
+		value *int
+	}{{"page", &page}, {"limit", &limit}} {
+		if values, ok := r.URL.Query()[param.name]; ok {
+			if len(values) != 1 {
+				httpapi.Error(w, 400, "VALIDATION_ERROR", "Invalid pagination parameters.")
+				return
+			}
+			parsed, err := strconv.Atoi(values[0])
+			if err != nil || parsed < 1 {
+				httpapi.Error(w, 400, "VALIDATION_ERROR", "Invalid pagination parameters.")
+				return
+			}
+			*param.value = parsed
+		}
+	}
+	if limit > 100 || page-1 > math.MaxInt/limit {
+		httpapi.Error(w, 400, "VALIDATION_ERROR", "Invalid pagination parameters.")
+		return
+	}
 	user, _ := auth.UserFromContext(r.Context())
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	reservations, err := h.store.ListReservations(ctx, user.ID)
+	reservations, total, err := h.store.ListReservations(ctx, user.ID, group, page, limit)
 	if err != nil {
 		reservationError(w, r, err)
 		return
 	}
-	httpapi.JSON(w, 200, ReservationList{Reservations: reservations})
+	httpapi.JSON(w, 200, ReservationList{Reservations: reservations, Page: page, Limit: limit, Total: total})
 }
 
 // CancelReservation cancels an unstarted reservation owned by the signed-in user.

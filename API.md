@@ -143,7 +143,7 @@ A repeated successful request is not treated as a second success: the duplicate 
 
 ### GET /api/reservations
 
-Return only the authenticated user's reservations, ordered by `start_time` descending and then `id`. No user selector is accepted. The assessment uses an unpaginated collection because its seeded demonstration dataset is small.
+Return only the authenticated user's reservations. The optional `group=upcoming` selects `SCHEDULED`, `WAITING`, and `ACTIVE` reservations, with active reservations first and the rest ordered by `start_time` ascending. `group=history` selects `COMPLETED`, `EXPIRED`, and `CANCELLED` reservations, ordered by `start_time` descending. Without `group`, all statuses are returned with active reservations first and the rest ordered by `start_time` descending. Equal start times are ordered by `id`. Query parameters `page` (default `1`) and `limit` (default `5`, maximum `100`) select a page within the chosen group. Both must be positive integers. The response includes that group's total across all pages. No user selector is accepted.
 
 ```json
 {
@@ -158,7 +158,10 @@ Return only the authenticated user's reservations, ordered by `start_time` desce
       "created_at": "2026-10-01T10:00:00Z",
       "updated_at": "2026-10-01T10:00:00Z"
     }
-  ]
+  ],
+  "page": 1,
+  "limit": 5,
+  "total": 1
 }
 ```
 

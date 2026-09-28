@@ -17,7 +17,8 @@ describe('ReservationRow', () => {
   it('cancels an unstarted booking and immediately marks it cancelled', async () => {
     vi.spyOn(api, 'cancelReservation').mockResolvedValue({ ...scheduled, status: 'CANCELLED' })
     const onCancelled = vi.fn()
-    render(<ReservationRow reservation={scheduled} chargerName="Charger 1" onCancelled={onCancelled} onUnauthorized={vi.fn()} />)
+    render(<table><tbody><ReservationRow reservation={scheduled} chargerName="Charger 1" onCancelled={onCancelled} onUnauthorized={vi.fn()} /></tbody></table>)
+    expect(screen.getByRole('row')).toHaveAccessibleName(/Charger 1/)
     await userEvent.click(screen.getByRole('button', { name: 'Cancel reservation for Charger 1' }))
     await waitFor(() => expect(screen.getByText('cancelled')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: /Cancel reservation/ })).not.toBeInTheDocument()
@@ -26,14 +27,14 @@ describe('ReservationRow', () => {
 
   it('keeps the cancel action and explains a conflict', async () => {
     vi.spyOn(api, 'cancelReservation').mockRejectedValue(new ApiError(409, 'RESERVATION_NOT_CANCELLABLE', 'Only scheduled or waiting reservations can be cancelled.'))
-    render(<ReservationRow reservation={scheduled} chargerName="Charger 1" onCancelled={vi.fn()} onUnauthorized={vi.fn()} />)
+    render(<table><tbody><ReservationRow reservation={scheduled} chargerName="Charger 1" onCancelled={vi.fn()} onUnauthorized={vi.fn()} /></tbody></table>)
     await userEvent.click(screen.getByRole('button', { name: 'Cancel reservation for Charger 1' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Only scheduled or waiting reservations can be cancelled.')
     expect(screen.getByRole('button', { name: 'Cancel reservation for Charger 1' })).toBeEnabled()
   })
 
   it('does not offer cancellation after charging starts', () => {
-    render(<ReservationRow reservation={{ ...scheduled, status: 'ACTIVE' }} chargerName="Charger 1" onCancelled={vi.fn()} onUnauthorized={vi.fn()} />)
+    render(<table><tbody><ReservationRow reservation={{ ...scheduled, status: 'ACTIVE' }} chargerName="Charger 1" onCancelled={vi.fn()} onUnauthorized={vi.fn()} /></tbody></table>)
     expect(screen.queryByRole('button', { name: /Cancel reservation/ })).not.toBeInTheDocument()
   })
 })

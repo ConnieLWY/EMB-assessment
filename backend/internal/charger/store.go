@@ -32,23 +32,37 @@ func (s *Store) ListChargers(ctx context.Context) ([]Charger, error) {
 	return chargers, rows.Err()
 }
 
-func (s *Store) ListReservations(ctx context.Context, userID string) ([]Reservation, error) {
+func (s *Store) ListReservations(ctx context.Context, userID, group string, page, limit int) ([]Reservation, int, error) {
+	filter := " WHERE user_id=$1"
+	order := " ORDER BY (status = 'ACTIVE') DESC, start_time DESC, id"
+	switch group {
+	case "upcoming":
+		filter += " AND status IN ('SCHEDULED', 'WAITING', 'ACTIVE')"
+		order = " ORDER BY (status = 'ACTIVE') DESC, start_time ASC, id"
+	case "history":
+		filter += " AND status IN ('COMPLETED', 'EXPIRED', 'CANCELLED')"
+		order = " ORDER BY start_time DESC, id"
+	}
+	var total int
+	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM reservations"+filter, userID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
 	rows, err := s.pool.Query(ctx, `SELECT id, user_id, charger_id, start_time, end_time, status, created_at, updated_at
-		FROM reservations WHERE user_id=$1 ORDER BY start_time DESC, id`, userID)
+		FROM reservations`+filter+order+` LIMIT $2 OFFSET $3`, userID, limit, (page-1)*limit)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	result := make([]Reservation, 0)
 	for rows.Next() {
 		var r Reservation
 		if err := rows.Scan(&r.ID, &r.UserID, &r.ChargerID, &r.StartTime, &r.EndTime, &r.Status, &r.CreatedAt, &r.UpdatedAt); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		r.UTC()
 		result = append(result, r)
 	}
-	return result, rows.Err()
+	return result, total, rows.Err()
 }
 
 func (r *Reservation) UTC() {

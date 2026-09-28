@@ -307,7 +307,7 @@
         },
         "/api/reservations": {
             "get": {
-                "description": "Returns only the signed-in user's reservations, ordered by start time descending.",
+                "description": "Returns only the signed-in user's reservations. Use group=upcoming for scheduled, waiting, and active reservations; group=history for completed, expired, and cancelled reservations. Groups are paginated independently.",
                 "produces": [
                     "application/json"
                 ],
@@ -316,11 +316,43 @@
                 ],
                 "summary": "List my reservations",
                 "operationId": "listReservations",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number, starting at 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 5,
+                        "description": "Page size, 1–100",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "upcoming",
+                            "history"
+                        ],
+                        "type": "string",
+                        "description": "Reservation group",
+                        "name": "group",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Current user's reservations",
                         "schema": {
                             "$ref": "#/definitions/charger.ReservationList"
+                        }
+                    },
+                    "400": {
+                        "description": "VALIDATION_ERROR",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
                         }
                     },
                     "401": {
@@ -570,11 +602,20 @@
         "charger.ReservationList": {
             "type": "object",
             "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
                 "reservations": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/charger.Reservation"
                     }
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },

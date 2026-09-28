@@ -119,6 +119,141 @@ func TestConcurrentReservations(t *testing.T) {
 	}
 }
 
+func TestReservationListOrderingAndPagination(t *testing.T) {
+	f := newFixture(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	for _, item := range []struct {
+		status string
+		start  time.Time
+	}{
+		{"COMPLETED", now.Add(-72 * time.Hour)},
+		{"ACTIVE", now.Add(-48 * time.Hour)},
+		{"CANCELLED", now.Add(24 * time.Hour)},
+		{"SCHEDULED", now.Add(48 * time.Hour)},
+	} {
+		_, err := f.pool.Exec(context.Background(), `INSERT INTO reservations(user_id,charger_id,start_time,end_time,status)
+			VALUES($1,'charger-1',$2,$3,$4)`, f.userID, item.start, item.start.Add(time.Hour), item.status)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	var otherID string
+	if err := f.pool.QueryRow(context.Background(), "SELECT id FROM users WHERE username='demo2'").Scan(&otherID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(context.Background(), `INSERT INTO reservations(user_id,charger_id,start_time,end_time)
+		VALUES($1,'charger-2',$2,$3)`, otherID, now.Add(72*time.Hour), now.Add(73*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		path string
+		page int
+		want []string
+	}{
+		{"/api/reservations?page=1&limit=2", 1, []string{"ACTIVE", "SCHEDULED"}},
+		{"/api/reservations?page=2&limit=2", 2, []string{"CANCELLED", "COMPLETED"}},
+		{"/api/reservations?page=3&limit=2", 3, []string{}},
+	} {
+		rec := request(f.router, "GET", tc.path, "", f.cookie)
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d %s", tc.path, rec.Code, rec.Body.String())
+		}
+		var body struct {
+			Reservations []struct {
+				Status string `json:"status"`
+			} `json:"reservations"`
+			Page, Limit, Total int
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if body.Total != 4 || body.Limit != 2 || body.Page != tc.page {
+			t.Fatalf("metadata: %s", rec.Body.String())
+		}
+		if len(body.Reservations) != len(tc.want) {
+			t.Fatalf("%s: %s", tc.path, rec.Body.String())
+		}
+		for i, want := range tc.want {
+			if body.Reservations[i].Status != want {
+				t.Fatalf("%s: %s", tc.path, rec.Body.String())
+			}
+		}
+	}
+	for _, path := range []string{"/api/reservations?page=0", "/api/reservations?limit=0", "/api/reservations?limit=101", "/api/reservations?page=nope"} {
+		rec := request(f.router, "GET", path, "", f.cookie)
+		if rec.Code != 400 || errorCode(t, rec) != "VALIDATION_ERROR" {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestReservationGroupsHaveIndependentPages(t *testing.T) {
+	f := newFixture(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	for _, item := range []struct {
+		status string
+		start  time.Time
+	}{
+		{"EXPIRED", now.Add(-72 * time.Hour)},
+		{"COMPLETED", now.Add(-48 * time.Hour)},
+		{"ACTIVE", now.Add(-24 * time.Hour)},
+		{"WAITING", now.Add(-12 * time.Hour)},
+		{"SCHEDULED", now.Add(48 * time.Hour)},
+		{"CANCELLED", now.Add(96 * time.Hour)},
+	} {
+		if _, err := f.pool.Exec(context.Background(), `INSERT INTO reservations(user_id,charger_id,start_time,end_time,status)
+			VALUES($1,'charger-1',$2,$3,$4)`, f.userID, item.start, item.start.Add(time.Hour), item.status); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defaultPage := request(f.router, "GET", "/api/reservations", "", f.cookie)
+	var defaultBody struct {
+		Reservations []json.RawMessage `json:"reservations"`
+		Limit        int               `json:"limit"`
+		Total        int               `json:"total"`
+	}
+	if err := json.Unmarshal(defaultPage.Body.Bytes(), &defaultBody); err != nil { t.Fatal(err) }
+	if defaultPage.Code != 200 || defaultBody.Limit != 5 || defaultBody.Total != 6 || len(defaultBody.Reservations) != 5 {
+		t.Fatalf("default page: %d %s", defaultPage.Code, defaultPage.Body.String())
+	}
+	for _, tc := range []struct {
+		path string
+		want []string
+	}{
+		{"/api/reservations?group=upcoming&page=1&limit=2", []string{"ACTIVE", "WAITING"}},
+		{"/api/reservations?group=upcoming&page=2&limit=2", []string{"SCHEDULED"}},
+		{"/api/reservations?group=history&page=1&limit=2", []string{"CANCELLED", "COMPLETED"}},
+		{"/api/reservations?group=history&page=2&limit=2", []string{"EXPIRED"}},
+	} {
+		rec := request(f.router, "GET", tc.path, "", f.cookie)
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d %s", tc.path, rec.Code, rec.Body.String())
+		}
+		var body struct {
+			Reservations []struct {
+				Status string `json:"status"`
+			} `json:"reservations"`
+			Total int `json:"total"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		if body.Total != 3 || len(body.Reservations) != len(tc.want) {
+			t.Fatalf("%s: %s", tc.path, rec.Body.String())
+		}
+		for i, want := range tc.want {
+			if body.Reservations[i].Status != want {
+				t.Fatalf("%s: %s", tc.path, rec.Body.String())
+			}
+		}
+	}
+	rec := request(f.router, "GET", "/api/reservations?group=unknown", "", f.cookie)
+	if rec.Code != 400 || errorCode(t, rec) != "VALIDATION_ERROR" {
+		t.Fatalf("unknown group: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestReservationRules(t *testing.T) {
 	f := newFixture(t)
 	start := time.Now().UTC().Add(3 * time.Hour).Truncate(time.Second)

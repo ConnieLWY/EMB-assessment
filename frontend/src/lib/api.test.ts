@@ -32,4 +32,12 @@ describe('API client', () => {
     expect(result.status).toBe('CANCELLED')
     expect(fetchMock).toHaveBeenCalledWith('/api/reservations/reservation-id/cancel', expect.objectContaining({ credentials: 'include', method: 'POST' }))
   })
+
+  it('requests a reservation page and keeps pagination metadata', async () => {
+    const payload = { reservations: [], page: 2, limit: 5, total: 14 }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await api.listReservations('history', 2)).toEqual(payload)
+    expect(fetchMock).toHaveBeenCalledWith('/api/reservations?group=history&page=2&limit=5', expect.objectContaining({ credentials: 'include' }))
+  })
 })
