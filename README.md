@@ -85,28 +85,6 @@ When signed in as `demo` or `demo2` in the local Compose dashboard, use **Concur
 
 The simulator ticks every 12 seconds and reservation lifecycle reconciliation runs every second. A charger currently in maintenance rejects new bookings; wait for it to return to available or choose another charger. Times in the form and reservation list use the browser's local time zone.
 
-## Fresh Verification Without Touching Existing Data
-
-Use a separate Compose project name and ports to get a new database volume while leaving the default project intact. Create an ignored `.env.verify` file in the repository root:
-
-```dotenv
-DB_PASSWORD=local-dev-only
-DB_PORT=56432
-BACKEND_PORT=8180
-FRONTEND_PORT=3300
-FRONTEND_ORIGIN=http://localhost:3300
-API_ORIGIN=http://localhost:8180
-```
-
-Then run:
-
-```sh
-docker compose -p ev-charger-review --env-file .env.verify up --build -d --wait
-docker compose -p ev-charger-review --env-file .env.verify ps
-```
-
-Open `http://localhost:3300`. The isolated API is at `http://localhost:8180`. `docker compose -p ev-charger-review --env-file .env.verify down` retains that project's data. Use `down --volumes` only when you intend to discard this isolated project's test database; it does not target the default project's volume.
-
 ## Swagger UI
 
 Open [Swagger UI](http://localhost:8080/swagger/) after starting the backend. Expand `GET /api/chargers`, select **Try it out**, then **Execute** to query the running database.
