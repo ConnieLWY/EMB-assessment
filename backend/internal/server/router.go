@@ -13,14 +13,15 @@ import (
 )
 
 type Dependencies struct {
-	Pool           *pgxpool.Pool
-	Now            func() time.Time
-	FrontendOrigin string
-	APIOrigin      string
-	CookieSecure   bool
-	Hub            *realtime.Hub
-	ChargerService *charger.Service
-	Logger         *slog.Logger
+	Pool                   *pgxpool.Pool
+	Now                    func() time.Time
+	FrontendOrigin         string
+	APIOrigin              string
+	CookieSecure           bool
+	ConcurrencyDemoEnabled bool
+	Hub                    *realtime.Hub
+	ChargerService         *charger.Service
+	Logger                 *slog.Logger
 }
 
 func NewRouter(deps Dependencies) http.Handler {
@@ -42,8 +43,12 @@ func NewRouter(deps Dependencies) http.Handler {
 	}
 	handler := charger.NewHandler(store, deps.ChargerService)
 	mux.HandleFunc("GET /api/chargers", handler.List)
-	authHandler := auth.NewHandler(auth.NewService(deps.Pool, deps.Now), deps.CookieSecure)
+	authService := auth.NewService(deps.Pool, deps.Now)
+	authHandler := auth.NewHandler(authService, deps.CookieSecure)
 	mux.Handle("POST /api/chargers/{id}/reserve", authHandler.RequireUser(http.HandlerFunc(handler.Reserve)))
+	if deps.ConcurrencyDemoEnabled {
+		mux.Handle("POST /api/demo/concurrency", authHandler.RequireUser(concurrencyDemoHandler(deps.Pool, authService, deps.APIOrigin)))
+	}
 	mux.Handle("GET /api/reservations", authHandler.RequireUser(http.HandlerFunc(handler.ListReservations)))
 	mux.Handle("POST /api/reservations/{id}/cancel", authHandler.RequireUser(http.HandlerFunc(handler.CancelReservation)))
 	mux.HandleFunc("POST /api/auth/login", authHandler.Login)

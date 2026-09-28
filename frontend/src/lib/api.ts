@@ -1,4 +1,4 @@
-import type { Charger, Reservation, ReserveInput, User } from "../types/api";
+import type { Charger, ConcurrencyDemoResult, Reservation, ReserveInput, User } from "../types/api";
 
 export class ApiError extends Error {
   constructor(
@@ -102,6 +102,10 @@ export const api = {
         signal,
       )
     ).reservation,
+  runConcurrencyDemo: (chargerId: string) =>
+    request<ConcurrencyDemoResult>("/api/demo/concurrency", "POST", {
+      charger_id: chargerId,
+    }),
 };
 
 export function websocketURL(): string {

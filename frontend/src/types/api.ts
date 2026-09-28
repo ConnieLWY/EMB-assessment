@@ -41,3 +41,33 @@ export interface ReserveInput {
   start_time: string;
   end_time: string;
 }
+
+export interface ConcurrencyDemoResult {
+  charger_id: string;
+  start_time: string;
+  end_time: string;
+  created: number;
+  conflicts: number;
+  persisted: number;
+  passed: boolean;
+  results: Array<{
+    number: number;
+    user: string;
+    status: number;
+    code?: string;
+    requested_at: string;
+    responded_at: string;
+    duration_ms: number;
+    request: {
+      method: string;
+      url: string;
+      headers: Record<string, string[]>;
+      body: unknown;
+    };
+    response: {
+      status: number;
+      headers: Record<string, string[]>;
+      body: unknown;
+    };
+  }>;
+}

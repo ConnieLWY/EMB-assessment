@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ReservationDialog } from "./components/ReservationDialog";
+import { ConcurrencyDemo } from "./components/ConcurrencyDemo";
 import { ReservationRow } from "./components/ReservationRow";
 import { useAuth } from "./hooks/useAuth";
 import { useChargers } from "./hooks/useChargers";
@@ -404,6 +405,16 @@ export default function App() {
               Live status shows current activity. Future time slots are checked
               when you book.
             </p>
+            {auth.user && (auth.user.username === "demo" || auth.user.username === "demo2") && (
+              <ConcurrencyDemo
+                chargers={live.chargers}
+                onComplete={() => {
+                  upcoming.refresh();
+                  history.refresh();
+                }}
+                onUnauthorized={auth.onUnauthorized}
+              />
+            )}
           </section>
           <aside className="account-panel" id="account-panel">
             {auth.user ? (

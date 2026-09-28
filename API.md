@@ -182,6 +182,10 @@ Cancel a reservation owned by the signed-in user. Only `SCHEDULED` and `WAITING`
 
 Success returns `200 OK` with `{ "reservation": ... }` and status `CANCELLED`. The record remains in the user's history, but the interval no longer blocks another reservation. Cancellation does not change current charger status or emit a device-status event. The frontend refreshes the private reservation list after success.
 
+## Local concurrency demo
+
+`POST /api/demo/concurrency` is enabled only when `CONCURRENCY_DEMO_ENABLED=true` (enabled by the local Compose file). It requires a `demo` or `demo2` login cookie, an allowed `Origin`, and JSON such as `{"charger_id":"charger-1"}`. The backend finds a future one-hour slot after existing bookings, then sends 10 separate concurrent HTTP requests through the local `POST /api/chargers/{id}/reserve` route (five per seeded user). It returns each attempt's `requested_at`, `responded_at`, `duration_ms`, request method/URL/headers/body, and response status/headers/body, plus `created`, `conflicts`, `persisted`, and `passed` totals. Session cookie values and `Set-Cookie` headers are redacted or omitted. A successful run leaves one real reservation.
+
 ## WebSocket
 
 ### GET /api/ws

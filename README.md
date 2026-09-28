@@ -81,6 +81,8 @@ See [frontend/README.md](frontend/README.md) for frontend behavior and local dev
 4. Cancel a scheduled reservation to release its slot, or use a near-future reservation to watch `SCHEDULED`, `ACTIVE`, and `COMPLETED`. Active charging cannot be cancelled.
 5. Restart the backend with `docker compose restart backend`. The browser reconnects its live feed, and the reservation remains visible after signing in again.
 
+When signed in as `demo` or `demo2` in the local Compose dashboard, use **Concurrency check** to pick a charger and run 10 simultaneous HTTP reservation requests (five per user). The backend chooses a future slot after that charger's existing bookings, sends 10 separate requests to its local `/api/chargers/{id}/reserve` route using both demo sessions, and verifies that exactly one reservation was saved. Expand an attempt to inspect its request and response, including timestamps, duration, headers, and JSON bodies. Session cookies are redacted. The winning reservation remains in the database. The endpoint is disabled outside Compose unless `CONCURRENCY_DEMO_ENABLED=true` is set.
+
 The simulator ticks every 12 seconds and reservation lifecycle reconciliation runs every second. A charger currently in maintenance rejects new bookings; wait for it to return to available or choose another charger. Times in the form and reservation list use the browser's local time zone.
 
 ## Fresh Verification Without Touching Existing Data

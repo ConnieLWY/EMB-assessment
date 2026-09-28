@@ -83,7 +83,7 @@ func run() error {
 	defer func() { workerCancel(); workers.Wait() }()
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           server.NewRouter(server.Dependencies{Pool: pool, FrontendOrigin: cfg.FrontendOrigin, APIOrigin: cfg.APIOrigin, CookieSecure: cfg.CookieSecure, Hub: hub, ChargerService: chargerService}),
+		Handler:           server.NewRouter(server.Dependencies{Pool: pool, FrontendOrigin: cfg.FrontendOrigin, APIOrigin: cfg.APIOrigin, CookieSecure: cfg.CookieSecure, ConcurrencyDemoEnabled: os.Getenv("CONCURRENCY_DEMO_ENABLED") == "true", Hub: hub, ChargerService: chargerService}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
