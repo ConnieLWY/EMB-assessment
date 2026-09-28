@@ -14,6 +14,7 @@ import (
 
 	"ev-charger-assessment/backend/internal/realtime"
 	"ev-charger-assessment/backend/internal/server"
+
 	"github.com/coder/websocket"
 )
 

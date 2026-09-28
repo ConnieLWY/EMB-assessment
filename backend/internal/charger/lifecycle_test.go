@@ -8,6 +8,7 @@ import (
 
 	"ev-charger-assessment/backend/internal/charger"
 	"ev-charger-assessment/backend/internal/testutil"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

@@ -5,10 +5,11 @@ import (
 	"ev-charger-assessment/backend/internal/auth"
 	"ev-charger-assessment/backend/internal/charger"
 	"ev-charger-assessment/backend/internal/realtime"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Dependencies struct {

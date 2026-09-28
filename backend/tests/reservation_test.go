@@ -13,6 +13,7 @@ import (
 
 	"ev-charger-assessment/backend/internal/server"
 	"ev-charger-assessment/backend/internal/testutil"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -213,7 +214,9 @@ func TestReservationGroupsHaveIndependentPages(t *testing.T) {
 		Limit        int               `json:"limit"`
 		Total        int               `json:"total"`
 	}
-	if err := json.Unmarshal(defaultPage.Body.Bytes(), &defaultBody); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal(defaultPage.Body.Bytes(), &defaultBody); err != nil {
+		t.Fatal(err)
+	}
 	if defaultPage.Code != 200 || defaultBody.Limit != 5 || defaultBody.Total != 6 || len(defaultBody.Reservations) != 5 {
 		t.Fatalf("default page: %d %s", defaultPage.Code, defaultPage.Body.String())
 	}

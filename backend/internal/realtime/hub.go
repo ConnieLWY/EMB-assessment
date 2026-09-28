@@ -10,6 +10,7 @@ import (
 
 	"ev-charger-assessment/backend/internal/charger"
 	"ev-charger-assessment/backend/internal/httpapi"
+
 	"github.com/coder/websocket"
 )
 

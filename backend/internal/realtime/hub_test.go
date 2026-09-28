@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"ev-charger-assessment/backend/internal/charger"
+
 	"github.com/coder/websocket"
 )
 

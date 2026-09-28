@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"ev-charger-assessment/backend/internal/testutil"
+
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
